@@ -1,4 +1,4 @@
-java 版wxbot，刚完成，只有最基本的收发文本消息功能，欢迎大家一起研究  
+java 版wxbot，刚完成，只有最基本的收发文本消息功能，欢迎大家一起研究  
 项目参考python版wxbot等一些相关项目，github地址：https://github.com/liuwons/wxBot  
 项目采用maven，和springboot  
 下载后直接运行WeixinApplication中的main方法启动  
