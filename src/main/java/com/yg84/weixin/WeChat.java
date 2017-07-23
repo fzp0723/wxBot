@@ -6,7 +6,12 @@ import com.google.zxing.BarcodeFormat;
 import com.google.zxing.EncodeHintType;
 import com.google.zxing.MultiFormatWriter;
 import com.google.zxing.common.BitMatrix;
+import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel;
+import com.google.zxing.qrcode.encoder.ByteMatrix;
+import com.google.zxing.qrcode.encoder.Encoder;
+import com.google.zxing.qrcode.encoder.QRCode;
 import com.squareup.okhttp.*;
+import org.apache.commons.lang.SystemUtils;
 
 import java.io.File;
 import java.net.CookieManager;
@@ -83,6 +88,7 @@ public class WeChat {
     private MessageHandler handler;
 
     public WeChat(MessageHandler handler) {
+        System.setProperty("jsse.enableSNIExtension", "false");
         if (handler == null)
             this.handler = new DefaultMessageHandler(this);
         else
@@ -247,17 +253,48 @@ public class WeChat {
 
     private void genQRCode(String uuid) throws Exception{
         String text = String.format(QR_CODE_URL, uuid); // 二维码内容
-        int width = 300; // 二维码图片宽度
-        int height = 300; // 二维码图片高度
-        String format = "png";// 二维码的图片格式
         Hashtable<EncodeHintType, String> hints = new Hashtable<EncodeHintType, String>();
         hints.put(EncodeHintType.CHARACTER_SET, "utf-8");   // 内容所使用字符集编码
-        BitMatrix bitMatrix = new MultiFormatWriter().encode(text, BarcodeFormat.QR_CODE, width, height, hints);
-        // 生成二维码
-        File outputFile = new File("./result.png");
-        MatrixToImageWriter.writeToFile(bitMatrix, format, outputFile);
-        Runtime run = Runtime.getRuntime();
-        run.exec("open " + outputFile.getAbsolutePath());
+        QRCode qrCode = Encoder.encode(text, ErrorCorrectionLevel.L, hints);
+        if (SystemUtils.IS_OS_LINUX) {
+            byte[][] matrix = qrCode.getMatrix().getArray();
+            System.out.print("\033[47;30m  \033[0m");
+            for (int i = 0;i < matrix.length;i++) {
+                System.out.print("\033[47;30m  \033[0m");
+            }
+            System.out.println("\033[47;30m  \033[0m");
+            for (int i = 0;i < matrix.length; i++) {
+                System.out.print("\033[47;30m  \033[0m");
+                for (int j = 0;j < matrix[i].length; j++) {
+                    if (matrix[i][j] == 1) {
+                        System.out.print("\033[40;37m  \033[0m");
+                    }else {
+                        System.out.print("\033[47;30m  \033[0m");
+                    }
+                }
+                System.out.println("\033[47;30m  \033[0m");
+            }
+            System.out.print("\033[47;30m  \033[0m");
+            for (int i = 0;i < matrix.length;i++) {
+                System.out.print("\033[47;30m  \033[0m");
+            }
+            System.out.println("\033[47;30m  \033[0m");
+        }else if (SystemUtils.IS_OS_WINDOWS){
+
+        }else if (SystemUtils.IS_OS_MAC) {
+            int width = 300; // 二维码图片宽度
+            int height = 300; // 二维码图片高度
+            String format = "png";// 二维码的图片格式
+            BitMatrix bitMatrix = new MultiFormatWriter().encode(text, BarcodeFormat.QR_CODE, width, height, hints);
+            // 生成二维码
+            File outputFile = new File("./result.png");
+            MatrixToImageWriter.writeToFile(bitMatrix, format, outputFile);
+            Runtime run = Runtime.getRuntime();
+            run.exec("open " + outputFile.getAbsolutePath());
+        }else {
+            throw new RuntimeException("未知操作系统平台，无法生成二维码");
+        }
+
     }
 
     private void genSyncKey() {
