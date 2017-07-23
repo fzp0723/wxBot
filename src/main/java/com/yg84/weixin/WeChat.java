@@ -7,7 +7,6 @@ import com.google.zxing.EncodeHintType;
 import com.google.zxing.MultiFormatWriter;
 import com.google.zxing.common.BitMatrix;
 import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel;
-import com.google.zxing.qrcode.encoder.ByteMatrix;
 import com.google.zxing.qrcode.encoder.Encoder;
 import com.google.zxing.qrcode.encoder.QRCode;
 import com.squareup.okhttp.*;
@@ -51,17 +50,15 @@ public class WeChat {
 
     private String pass_ticket;
 
-    //https://wx.qq.com/cgi-bin/mmwebwx-bin/webwxinit?r=1500478285139&lang=en_US&pass_ticket=IUFOH%2Bn9wawwnZY6rzs9DvU1Sw54raR2jlTBgMJ0FP8tfHnjz4hvub%2BbbJNeME8S
-    private final String INIT_URL = "https://wx.qq.com/cgi-bin/mmwebwx-bin/webwxinit?r=%s&lang=en_US&pass_ticket=%s&skey=%s";
+    private String BASE_URL;
+
+    private String BASE_HOST;
 
     private String DeviceID = "e" + (Math.random() + "").substring(2, 17);
 
-    //{'Sid': u'M0/Hekc0nWmeat7S', 'Skey': u'@crypt_943e81a7_e645694e088200eb35cec07d006de359', 'DeviceID': 'e110437471594597', 'Uin': u'1219744940'}
     private String INIT_JSON="{\"BaseRequest\":{\"Sid\": \"%s\", \"Skey\": \"%s\", \"DeviceID\": \"%s\", \"Uin\": \"%s\"}}";
 
     private static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
-
-    private String PERSON_URL = "https://wx.qq.com/cgi-bin/mmwebwx-bin/webwxgetcontact?r=";
 
     private MyAcount myAcount;
 
@@ -77,13 +74,11 @@ public class WeChat {
 
     private String SyncKey = "";
 
+    private String SYNC_HOST;
+
     private String SYNC_URL = "https://webpush.weixin.qq.com/cgi-bin/mmwebwx-bin/synccheck?";
 
     private Timer SYNC_TIMER = new Timer();
-
-    private String GET_MSG_URL = "https://wx.qq.com/cgi-bin/mmwebwx-bin/webwxsync?";
-
-    private String SEND_MSG_URL = "https://wx.qq.com/cgi-bin/mmwebwx-bin/webwxsendmsg?pass_ticket=%s";
 
     private MessageHandler handler;
 
@@ -129,7 +124,7 @@ public class WeChat {
         String msgId = (getTimestamp() * 1000) + ((Math.random() + "").substring(0, 5).replace(".", ""));
         String paramTemplate = "{\"Msg\": {\"FromUserName\": \"%s\", \"LocalID\": \"%s\", \"Type\": 1, \"ToUserName\": \"%s\", \"Content\": \"%s\", \"ClientMsgId\": \"%S\"}, \"BaseRequest\": {\"Sid\": \"%s\", \"Skey\": \"%s\", \"DeviceID\": \"%s\", \"Uin\": %s}}";
         String json = String.format(paramTemplate, fromUserName, msgId, toUserName, content, msgId, wxsid, skey, DeviceID, wxuin);
-        String url = String.format(SEND_MSG_URL, pass_ticket);
+        String url = String.format(BASE_URL + "/webwxsendmsg?pass_ticket=%s", pass_ticket);
         Response response = postJson(url, json);
         if (!response.isSuccessful())
             return "发送失败！";
@@ -168,7 +163,10 @@ public class WeChat {
 
 
     private String init() throws Exception{
-        String url = String.format(INIT_URL, getTimestamp(), pass_ticket, skey);
+        //https://wx2.qq.com/cgi-bin/mmwebwx-bin/webwxinit?r=1500802067&lang=en_US&pass_ticket=nUdHkjHvQdDvTjkKgwXvWKxhUnaHRVkEThSlewnfN96PrCKNz7BzfnHsJMeGEDIv'
+        //https://wx.qq.com/cgi-bin/mmwebwx-bin/webwxinit?r=1500802122287&lang=en_US&pass_ticket=OHko%2FnZBuD7LEo263JXXkoDfDqQPrTyV%2FzVScFha0TjoGUYrOwAPUpW2kudYrYWy&skey=@crypt_1f56ee6a_6635b93ce4b5e19d2b7ce05344cb71bb
+        String paramTemplate = "/webwxinit?r=%s&lang=en_US&pass_ticket=%s&skey=%s";
+        String url = String.format(BASE_URL + paramTemplate, getTimestamp(), pass_ticket, skey);
         String json = String.format(INIT_JSON, wxsid, skey, DeviceID, wxuin);
         Response response = postJson(url, json);
         if (!response.isSuccessful())
@@ -178,7 +176,7 @@ public class WeChat {
         initMyAcount(msgObject);
         initSyncKey(msgObject);
         initContact();
-        initTimer();
+        testSyncAndInitTimer();
         return "微信初始化成功！";
     }
 
@@ -187,7 +185,7 @@ public class WeChat {
 
     private String sync() throws Exception {
         String params = "r=%s&sid=%s&uin=%s&skey=%s&deviceid=%s&synckey=%s&_=%s";
-        String url = SYNC_URL + String.format(params, getTimestamp(), wxsid, wxuin, skey, DeviceID, SyncKey, getTimestamp());
+        String url = "https://" + SYNC_HOST + "/cgi-bin/mmwebwx-bin/synccheck?" + String.format(params, getTimestamp(), wxsid, wxuin, skey, DeviceID, SyncKey, getTimestamp());
         Response response = get(url);
         if (!response.isSuccessful())
             return "同步失败！";
@@ -198,13 +196,13 @@ public class WeChat {
         if ("2".equals(m.group(2))) {
             receiveMsg();
         }
-        return "同步成功！";
+        return m.group(1);
     }
 
     private String receiveMsg() throws Exception{
         String params = "sid=%s&skey=%s&lang=en_US&pass_ticket=%s";
         String postMsg = "{\"BaseRequest\" : {\"Uin\":%s,\"Sid\":\"%s\"},\"SyncKey\" : %s,\"rr\" :%s}";
-        String url = GET_MSG_URL + String.format(params, wxsid, skey, pass_ticket);
+        String url = BASE_URL + "/webwxsync?" + String.format(params, wxsid, skey, pass_ticket);
         String json = String.format(postMsg, wxuin, wxsid, SyncKeyObject.toJSONString(), getTimestamp());
         Response response = postJson(url, json);
         if (!response.isSuccessful())
@@ -242,6 +240,9 @@ public class WeChat {
     private boolean getRedirect_uri(String str) {
         if (str.indexOf("window.redirect_uri=") != -1) {
             redirect_uri = str.substring(str.indexOf("\"") + 1, str.lastIndexOf("\"")) + "&fun=new";
+            BASE_URL = redirect_uri.substring(0, redirect_uri.lastIndexOf("/"));
+            String tempHost = BASE_URL.substring(8);
+            BASE_HOST = tempHost.substring(0, tempHost.indexOf("/"));
             return true;
         }
         return false;
@@ -321,7 +322,25 @@ public class WeChat {
         return true;
     }
 
-    private void initTimer() {
+    private void testSyncAndInitTimer() throws Exception{
+//        def test_sync_check(self):
+//        for host1 in ['webpush.', 'webpush2.']:
+//        self.sync_host = host1+self.base_host
+//        try:
+//        retcode = self.sync_check()[0]
+//        except:
+//        retcode = -1
+//        if retcode == '0':
+//        return True
+//        return False
+        String[] hosts = new String[]{"webpush.","webpush2."};
+        for (String host : hosts) {
+            SYNC_HOST = host + BASE_HOST;
+            String retcode = sync();
+            if ("0".equals(retcode)) {
+                break;
+            }
+        }
         SYNC_TIMER.schedule(new TimerTask() {
             @Override
             public void run() {
@@ -346,7 +365,7 @@ public class WeChat {
     }
 
     private String initContact() throws Exception{
-        String url = PERSON_URL + getTimestamp();
+        String url = BASE_URL + "/webwxgetcontact?r=" + getTimestamp();
         String json = "{}";
         Response response = postJson(url, json);
         if (!response.isSuccessful())
