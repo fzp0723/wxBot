@@ -281,7 +281,16 @@ public class WeChat {
             }
             System.out.println("\033[47;30m  \033[0m");
         }else if (SystemUtils.IS_OS_WINDOWS){
-
+            int width = 300; // 二维码图片宽度
+            int height = 300; // 二维码图片高度
+            String format = "png";// 二维码的图片格式
+            BitMatrix bitMatrix = new MultiFormatWriter().encode(text, BarcodeFormat.QR_CODE, width, height, hints);
+            // 生成二维码
+            File outputFile = new File("./result.png");
+            MatrixToImageWriter.writeToFile(bitMatrix, format, outputFile);
+            Runtime run = Runtime.getRuntime();
+            System.out.println("cmd /c start " + outputFile.getAbsolutePath().replace(".\\", "").replace(":\\", ":\\\\"));
+            run.exec("cmd /c start " + outputFile.getAbsolutePath().replace(".\\", "").replace(":\\", ":\\\\"));
         }else if (SystemUtils.IS_OS_MAC) {
             int width = 300; // 二维码图片宽度
             int height = 300; // 二维码图片高度
