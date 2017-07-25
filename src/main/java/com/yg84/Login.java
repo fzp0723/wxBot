@@ -22,7 +22,7 @@ public class Login {
         return WeixinApplication.weChat.sendMsg(name, content);
     }
 
-    @RequestMapping
+    @RequestMapping(value = "/getContact")
     public List<Contact> getContact() {
         return WeixinApplication.weChat.getContacts();
     }

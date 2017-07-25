@@ -342,7 +342,7 @@ public class WeChat {
 //        if retcode == '0':
 //        return True
 //        return False
-        String[] hosts = new String[]{"webpush.","webpush2."};
+        String[] hosts = new String[]{"webpush."};
         for (String host : hosts) {
             SYNC_HOST = host + BASE_HOST;
             String retcode = sync();
