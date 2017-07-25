@@ -1,8 +1,10 @@
 package com.yg84;
 
-import com.squareup.okhttp.OkHttpClient;
+import com.yg84.weixin.Contact;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 /**
  * Created by fangzhipeng on 2017/7/16.
@@ -20,4 +22,8 @@ public class Login {
         return WeixinApplication.weChat.sendMsg(name, content);
     }
 
+    @RequestMapping
+    public List<Contact> getContact() {
+        return WeixinApplication.weChat.getContacts();
+    }
 }
