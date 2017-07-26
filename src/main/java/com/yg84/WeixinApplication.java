@@ -10,7 +10,6 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 public class WeixinApplication {
 
 
-	public static WeChat weChat = new WeChat(null);
 
 	public static void main(String[] args) {
 		System.setProperty("jsse.enableSNIExtension", "false");

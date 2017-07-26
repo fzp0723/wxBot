@@ -5,8 +5,17 @@ package com.yg84.weixin;
  */
 public class Message {
 
+    private Integer msgType;
     private String fromUserName;
     private String content;
+
+    public Integer getMsgType() {
+        return msgType;
+    }
+
+    public void setMsgType(Integer msgType) {
+        this.msgType = msgType;
+    }
 
     public String getFromUserName() {
         return fromUserName;
