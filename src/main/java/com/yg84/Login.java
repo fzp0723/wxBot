@@ -11,6 +11,7 @@ import javax.annotation.PostConstruct;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Created by fangzhipeng on 2017/7/16.
@@ -53,6 +54,16 @@ public class Login {
         List<Message> messages = new ArrayList<>();
         Message message;
         while ((message = messageQueue.poll()) != null) {
+            messages.add(message);
+        }
+        return messages;
+    }
+
+    @RequestMapping(value = "/syncLoadMessage")
+    public List<Message> syncLoadMessage() throws Exception{
+        List<Message> messages = new ArrayList<>();
+        Message message;
+        while ((message = messageQueue.poll(5, TimeUnit.SECONDS)) != null) {
             messages.add(message);
         }
         return messages;
