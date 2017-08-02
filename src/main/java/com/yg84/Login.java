@@ -22,8 +22,10 @@ public class Login {
     public static WeChat weChat;
     ArrayBlockingQueue<Message> messageQueue = new ArrayBlockingQueue<Message>(10000);
 
-    @PostConstruct
     public void initWeChat() {
+        if (weChat != null) {
+            weChat.stopProcessThread();
+        }
         MessageHandler handler = new MessageHandler() {
             @Override
             public void handleMsg(List<Message> messages) throws Exception {
@@ -36,6 +38,7 @@ public class Login {
 
     @RequestMapping(value = "/login")
     public String login() throws Exception {
+        initWeChat();
         return weChat.run();
     }
 
@@ -62,9 +65,12 @@ public class Login {
     @RequestMapping(value = "/syncLoadMessage")
     public List<Message> syncLoadMessage() throws Exception{
         List<Message> messages = new ArrayList<>();
-        Message message;
-        while ((message = messageQueue.poll(5, TimeUnit.SECONDS)) != null) {
+        Message message = messageQueue.poll(5, TimeUnit.SECONDS);
+        if (message != null) {
             messages.add(message);
+            while ((message = messageQueue.poll()) != null) {
+                messages.add(message);
+            }
         }
         return messages;
     }

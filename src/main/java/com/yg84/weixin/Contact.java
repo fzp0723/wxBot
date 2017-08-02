@@ -11,6 +11,7 @@ public class Contact {
     private String userName;
     private String nickName;
     private String remarkName;
+    private String headImgUrl;
 
     public String getUserName() {
         return userName;
@@ -34,5 +35,13 @@ public class Contact {
 
     public void setRemarkName(String remarkName) {
         this.remarkName = remarkName;
+    }
+
+    public String getHeadImgUrl() {
+        return headImgUrl;
+    }
+
+    public void setHeadImgUrl(String headImgUrl) {
+        this.headImgUrl = headImgUrl;
     }
 }

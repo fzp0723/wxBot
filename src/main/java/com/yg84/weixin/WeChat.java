@@ -66,8 +66,6 @@ public class WeChat {
 
     private Map<String, Contact> contactByUserName;
 
-    private JSONArray member;
-
     private JSONObject MY_ACOUNT;
 
     private JSONObject SyncKeyObject;
@@ -81,6 +79,8 @@ public class WeChat {
     private Timer SYNC_TIMER = new Timer();
 
     private MessageHandler handler;
+
+    private boolean dealMsg = true;
 
     public WeChat(MessageHandler handler) {
         System.setProperty("jsse.enableSNIExtension", "false");
@@ -163,8 +163,6 @@ public class WeChat {
 
 
     private String init() throws Exception{
-        //https://wx2.qq.com/cgi-bin/mmwebwx-bin/webwxinit?r=1500802067&lang=en_US&pass_ticket=nUdHkjHvQdDvTjkKgwXvWKxhUnaHRVkEThSlewnfN96PrCKNz7BzfnHsJMeGEDIv'
-        //https://wx.qq.com/cgi-bin/mmwebwx-bin/webwxinit?r=1500802122287&lang=en_US&pass_ticket=OHko%2FnZBuD7LEo263JXXkoDfDqQPrTyV%2FzVScFha0TjoGUYrOwAPUpW2kudYrYWy&skey=@crypt_1f56ee6a_6635b93ce4b5e19d2b7ce05344cb71bb
         String paramTemplate = "/webwxinit?r=%s&lang=en_US&pass_ticket=%s&skey=%s";
         String url = String.format(BASE_URL + paramTemplate, getTimestamp(), pass_ticket, skey);
         String json = String.format(INIT_JSON, wxsid, skey, DeviceID, wxuin);
@@ -175,12 +173,23 @@ public class WeChat {
         JSONObject msgObject = JSONObject.parseObject(msg);
         initMyAcount(msgObject);
         initSyncKey(msgObject);
-        initContact();
+        notifyWeixin();
         testSyncAndInitTimer();
+        initContact();
         return "微信初始化成功！";
     }
 
-
+    private String notifyWeixin() throws Exception{
+        String msgId = (getTimestamp() * 1000) + ((Math.random() + "").substring(0, 5).replace(".", ""));
+        String url = BASE_URL + "/webwxstatusnotify?lang=zh_CN&pass_ticket=" + pass_ticket;
+        String jsonTemplate = "{\"BaseRequest\": {\"Sid\": \"%s\", \"Skey\": \"%s\", \"DeviceID\": \"%s\", \"Uin\": %s},\"Code\": 3,\"FromUserName\": \"%s\",\"ToUserName\": \"%s\",\"ClientMsgId\": %s}";
+        String json = String.format(jsonTemplate, wxsid, skey, DeviceID, wxuin, myAcount.getUserName(), myAcount.getUserName(), msgId);
+        Response response = postJson(url, json);
+        if (!response.isSuccessful())
+            return "微信服务器唤醒失败";
+        String msg = response.body().string();
+        return "微信唤醒成功！";
+    }
 
 
     private String sync() throws Exception {
@@ -332,16 +341,6 @@ public class WeChat {
     }
 
     private void testSyncAndInitTimer() throws Exception{
-//        def test_sync_check(self):
-//        for host1 in ['webpush.', 'webpush2.']:
-//        self.sync_host = host1+self.base_host
-//        try:
-//        retcode = self.sync_check()[0]
-//        except:
-//        retcode = -1
-//        if retcode == '0':
-//        return True
-//        return False
         String[] hosts = new String[]{"webpush."};
         for (String host : hosts) {
             SYNC_HOST = host + BASE_HOST;
@@ -351,16 +350,6 @@ public class WeChat {
             }
         }
         new ReceiveMsgThread().start();
-//        SYNC_TIMER.schedule(new TimerTask() {
-//            @Override
-//            public void run() {
-//                try {
-//                    sync();
-//                } catch (Exception e) {
-//                    e.printStackTrace();
-//                }
-//            }
-//        }, 1000, 2000);
     }
 
     private void initMyAcount(JSONObject msgObject) {
@@ -381,10 +370,10 @@ public class WeChat {
         if (!response.isSuccessful())
             return "获取朋友列表失败！";
         String msg = response.body().string();
-        member = JSONObject.parseObject(msg).getJSONArray("MemberList");
         contacts = JSONObject.parseArray(JSONObject.parseObject(msg).getString("MemberList"), Contact.class);
         contactByUserName = new HashMap<>();
         contacts.forEach(contact -> {
+            contact.setHeadImgUrl(BASE_URL + contact.getHeadImgUrl() + skey);
             contactByUserName.put(contact.getUserName(), contact);
         });
         return "获取朋友列表成功！";
@@ -398,10 +387,14 @@ public class WeChat {
         System.out.println(m.find());
     }
 
+    public void stopProcessThread() {
+        dealMsg = false;
+    }
+
     class ReceiveMsgThread extends Thread {
         @Override
         public void run() {
-            while (true) {
+            while (dealMsg) {
                 try {
                     sync();
                 } catch (Exception e) {
