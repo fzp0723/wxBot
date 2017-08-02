@@ -193,7 +193,7 @@ public class WeChat {
         Pattern pattern = Pattern.compile("retcode:\"(.*)\",selector:\"(.*)\"");
         Matcher m = pattern.matcher(msg);
         m.find();
-        if ("2".equals(m.group(2))) {
+        if (!"0".equals(m.group(2))) {
             receiveMsg();
         }
         return m.group(1);
@@ -350,16 +350,17 @@ public class WeChat {
                 break;
             }
         }
-        SYNC_TIMER.schedule(new TimerTask() {
-            @Override
-            public void run() {
-                try {
-                    sync();
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }
-        }, 1000, 2000);
+        new ReceiveMsgThread().start();
+//        SYNC_TIMER.schedule(new TimerTask() {
+//            @Override
+//            public void run() {
+//                try {
+//                    sync();
+//                } catch (Exception e) {
+//                    e.printStackTrace();
+//                }
+//            }
+//        }, 1000, 2000);
     }
 
     private void initMyAcount(JSONObject msgObject) {
@@ -395,6 +396,19 @@ public class WeChat {
         Pattern pattern = Pattern.compile("retcode:\"(.*)\",selector:\"(.*)\"");
         Matcher m = pattern.matcher(msg);
         System.out.println(m.find());
+    }
+
+    class ReceiveMsgThread extends Thread {
+        @Override
+        public void run() {
+            while (true) {
+                try {
+                    sync();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }
     }
 
 }
