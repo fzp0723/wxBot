@@ -5,6 +5,7 @@ package com.yg84.weixin;
  */
 public class Message {
 
+    private String msgId;
     private Integer msgType;
     private String fromUserName;
     private String content;
@@ -31,5 +32,13 @@ public class Message {
 
     public void setContent(String content) {
         this.content = content;
+    }
+
+    public String getMsgId() {
+        return msgId;
+    }
+
+    public void setMsgId(String msgId) {
+        this.msgId = msgId;
     }
 }

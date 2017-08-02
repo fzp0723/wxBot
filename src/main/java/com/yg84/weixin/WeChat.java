@@ -16,6 +16,7 @@ import javax.swing.*;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.CookieManager;
 import java.net.CookiePolicy;
 import java.sql.Timestamp;
@@ -152,6 +153,19 @@ public class WeChat {
         return null;
     }
 
+    /**
+     * 获取缓存的媒体文件
+     * @param msgId 消息id
+     * @param type 媒体文件类型，0-图片，1-声音
+     * @return
+     */
+    public File getMediaFile(String msgId, Integer type) {
+        File file = new File(tempRootDir, "/temp/" + msgId + (type == 0 ? ".jpg" : ".mp3"));
+        if (file.exists())
+            return file;
+        return null;
+    }
+
     public void stopProcessThread() {
         dealMsg = false;
     }
@@ -242,14 +256,59 @@ public class WeChat {
         if (!response.isSuccessful())
             return "接收消息失败！";
         String msg = response.body().string();
+        System.out.println(msg);
         JSONObject msgObject = JSONObject.parseObject(msg);
         if (0 == msgObject.getJSONObject("BaseResponse").getInteger("Ret")) {
             List<Message> messages = JSONObject.parseArray(msgObject.getString("AddMsgList"), Message.class);
+            for (Message message : messages) {
+                if (message.getMsgType() == 3) {  //图片消息
+                    dealPicMsg(message);
+                }else if (message.getMsgType() == 34) { //语音消息
+                    dealVoiceMsg(message);
+                }
+            }
             handler.handleMsg(messages);
             SyncKeyObject = msgObject.getJSONObject("SyncCheckKey");
             genSyncKey();
         }
         return "消息处理成功！";
+    }
+
+    private String dealVoiceMsg(Message message) throws Exception{
+        String url = BASE_URL + "/webwxgetvoice?";
+        String params = "msgid=%s&skey=%s";
+        Response response = get(url + String.format(params, message.getMsgId(), skey));
+        if (!response.isSuccessful())
+            return "处理语音消息失败！";
+        byte[] buf = new byte[1024];
+        int len = -1;
+        InputStream in = response.body().byteStream();
+        File file = new File(tempRootDir, "/temp/" + message.getMsgId() + ".mp3");
+        OutputStream out = new FileOutputStream(file);
+        while ((len = in.read(buf)) != -1) {
+            out.write(buf, 0, len);
+        }
+        in.close();
+        out.close();
+        return "处理成功！";
+    }
+
+    private String dealPicMsg(Message message) throws Exception{
+        String url = BASE_URL + "/webwxgetmsgimg?&MsgID=%s&skey=%s&type=slave";
+        Response response = get(String.format(url, message.getMsgId(), skey));
+        if (!response.isSuccessful())
+            return "处理图片消息失败！";
+        byte[] buf = new byte[1024];
+        int len = -1;
+        InputStream in = response.body().byteStream();
+        File file = new File(tempRootDir, "/temp/" + message.getMsgId() + ".jpg");
+        OutputStream out = new FileOutputStream(file);
+        while ((len = in.read(buf)) != -1) {
+            out.write(buf, 0, len);
+        }
+        in.close();
+        out.close();
+        return "处理成功！";
     }
 
     private Response get(String url) throws Exception{
@@ -420,6 +479,9 @@ public class WeChat {
         File icondir = new File(tempRootDir, "/icon");
         if (!icondir.exists())
             icondir.mkdirs();
+        File tempdir = new File(tempRootDir, "/temp");
+        if (!tempdir.exists())
+            tempdir.mkdirs();
     }
 
     private void cacheContactIcon(List<Contact> contacts) {

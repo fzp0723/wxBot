@@ -31,6 +31,7 @@ public class Login {
             @Override
             public void handleMsg(List<Message> messages) throws Exception {
                 messageQueue.addAll(messages);
+                messages.forEach(System.out::println);
                 System.out.println("成功加入" + messages.size() + "条信息");
             }
         };
@@ -96,5 +97,21 @@ public class Login {
     @RequestMapping(value = "/getMyAcount")
     public MyAcount getMyAcount() {
         return weChat.getMyAcount();
+    }
+
+    @RequestMapping(value = "/getMediaFile")
+    public void getMediaFile(String msgId, Integer type, HttpServletResponse response) throws Exception{
+        File file = weChat.getMediaFile(msgId, type);
+        if (file != null) {
+            OutputStream out = response.getOutputStream();
+            InputStream in = new FileInputStream(file);
+            byte[] buf = new byte[2014];
+            int b = -1;
+            while ((b = in.read(buf)) != -1) {
+                out.write(buf, 0, b);
+            }
+            in.close();
+            out.close();
+        }
     }
 }
