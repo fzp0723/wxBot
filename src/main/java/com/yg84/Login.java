@@ -1,13 +1,14 @@
 package com.yg84;
 
-import com.yg84.weixin.Contact;
-import com.yg84.weixin.Message;
-import com.yg84.weixin.MessageHandler;
-import com.yg84.weixin.WeChat;
+import com.yg84.weixin.*;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import javax.annotation.PostConstruct;
+import javax.servlet.http.HttpServletResponse;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -22,7 +23,7 @@ public class Login {
     public static WeChat weChat;
     ArrayBlockingQueue<Message> messageQueue = new ArrayBlockingQueue<Message>(10000);
 
-    public void initWeChat() {
+    private void initWeChat() {
         if (weChat != null) {
             weChat.stopProcessThread();
         }
@@ -73,5 +74,27 @@ public class Login {
             }
         }
         return messages;
+    }
+
+    @RequestMapping(value = "/getContactIcon")
+    public void getContactIcon(String userName, HttpServletResponse response) throws Exception{
+        File file = weChat.getContactIcon(userName);
+        if (file != null) {
+            response.addHeader("Content-Type", "image/x-png");
+            OutputStream out = response.getOutputStream();
+            InputStream in = new FileInputStream(file);
+            byte[] buf = new byte[2014];
+            int b = -1;
+            while ((b = in.read(buf)) != -1) {
+                out.write(buf, 0, b);
+            }
+            in.close();
+            out.close();
+        }
+    }
+
+    @RequestMapping(value = "/getMyAcount")
+    public MyAcount getMyAcount() {
+        return weChat.getMyAcount();
     }
 }

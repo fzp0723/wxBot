@@ -12,12 +12,18 @@ import com.google.zxing.qrcode.encoder.QRCode;
 import com.squareup.okhttp.*;
 import org.apache.commons.lang.SystemUtils;
 
+import javax.swing.*;
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
 import java.net.CookieManager;
 import java.net.CookiePolicy;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.Timer;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -26,6 +32,8 @@ import java.util.regex.Pattern;
  * Created by fangzhipeng on 2017/7/18.
  */
 public class WeChat {
+
+    private File tempRootDir = new File(System.getProperty("user.home") + "/.wxBot");;
 
     private OkHttpClient client = new OkHttpClient();
 
@@ -91,12 +99,18 @@ public class WeChat {
         MyCookieStore cookieStore = new MyCookieStore();
         client.setCookieHandler(new CookieManager(cookieStore, CookiePolicy.ACCEPT_ALL));
         client.setReadTimeout(2, TimeUnit.MINUTES);
+        initTempDir();
     }
+
 
     public String run() throws Exception{
         login();
         init();
         return "启动成功！";
+    }
+
+    public MyAcount getMyAcount() {
+        return myAcount;
     }
 
     public List<Contact> getContacts() {
@@ -129,6 +143,17 @@ public class WeChat {
         if (!response.isSuccessful())
             return "发送失败！";
         return "发送成功!";
+    }
+
+    public File getContactIcon(String userName) {
+        File file = new File(tempRootDir, "/icon/" + userName + ".png");
+        if (file.exists())
+            return file;
+        return null;
+    }
+
+    public void stopProcessThread() {
+        dealMsg = false;
     }
 
     private String login() throws Exception{
@@ -266,6 +291,7 @@ public class WeChat {
         Hashtable<EncodeHintType, String> hints = new Hashtable<EncodeHintType, String>();
         hints.put(EncodeHintType.CHARACTER_SET, "utf-8");   // 内容所使用字符集编码
         QRCode qrCode = Encoder.encode(text, ErrorCorrectionLevel.L, hints);
+        File outputFile = new File(tempRootDir,"/qrcode/qrcode.png");
         if (SystemUtils.IS_OS_LINUX) {
             byte[][] matrix = qrCode.getMatrix().getArray();
             System.out.print("\033[47;30m  \033[0m");
@@ -295,10 +321,8 @@ public class WeChat {
             String format = "png";// 二维码的图片格式
             BitMatrix bitMatrix = new MultiFormatWriter().encode(text, BarcodeFormat.QR_CODE, width, height, hints);
             // 生成二维码
-            File outputFile = new File("./result.png");
             MatrixToImageWriter.writeToFile(bitMatrix, format, outputFile);
             Runtime run = Runtime.getRuntime();
-            System.out.println("cmd /c start " + outputFile.getAbsolutePath().replace(".\\", "").replace(":\\", ":\\\\"));
             run.exec("cmd /c start " + outputFile.getAbsolutePath().replace(".\\", "").replace(":\\", ":\\\\"));
         }else if (SystemUtils.IS_OS_MAC) {
             int width = 300; // 二维码图片宽度
@@ -306,7 +330,6 @@ public class WeChat {
             String format = "png";// 二维码的图片格式
             BitMatrix bitMatrix = new MultiFormatWriter().encode(text, BarcodeFormat.QR_CODE, width, height, hints);
             // 生成二维码
-            File outputFile = new File("./result.png");
             MatrixToImageWriter.writeToFile(bitMatrix, format, outputFile);
             Runtime run = Runtime.getRuntime();
             run.exec("open " + outputFile.getAbsolutePath());
@@ -373,9 +396,10 @@ public class WeChat {
         contacts = JSONObject.parseArray(JSONObject.parseObject(msg).getString("MemberList"), Contact.class);
         contactByUserName = new HashMap<>();
         contacts.forEach(contact -> {
-            contact.setHeadImgUrl(BASE_URL + contact.getHeadImgUrl() + skey);
+            contact.setHeadImgUrl(BASE_URL.replace("/cgi-bin/mmwebwx-bin", "") + contact.getHeadImgUrl() + skey);
             contactByUserName.put(contact.getUserName(), contact);
         });
+        cacheContactIcon(contacts);
         return "获取朋友列表成功！";
     }
 
@@ -387,8 +411,27 @@ public class WeChat {
         System.out.println(m.find());
     }
 
-    public void stopProcessThread() {
-        dealMsg = false;
+    private void initTempDir() {
+        if (!tempRootDir.exists())
+            tempRootDir.mkdirs();
+        File qrcodedir = new File(tempRootDir, "/qrcode");
+        if (!qrcodedir.exists())
+            qrcodedir.mkdirs();
+        File icondir = new File(tempRootDir, "/icon");
+        if (!icondir.exists())
+            icondir.mkdirs();
+    }
+
+    private void cacheContactIcon(List<Contact> contacts) {
+        File iconDir = new File(tempRootDir, "/icon");
+        File[] files = iconDir.listFiles();
+        for (File file1 : files) {
+            file1.delete();
+        }
+        ExecutorService executor = Executors.newFixedThreadPool(20);
+        for (Contact contact : contacts) {
+            executor.submit(new CacheIcon(contact));
+        }
     }
 
     class ReceiveMsgThread extends Thread {
@@ -404,4 +447,32 @@ public class WeChat {
         }
     }
 
+    class CacheIcon implements Runnable {
+
+        private Contact contact;
+
+        public CacheIcon(Contact contact) {
+            this.contact = contact;
+        }
+
+        @Override
+        public void run() {
+            try {
+                Response response = get(contact.getHeadImgUrl());
+                if (!response.isSuccessful())
+                    return;
+                byte[] buf = new byte[2014];
+                int b = -1;
+                FileOutputStream out = new FileOutputStream(new File(tempRootDir, "/icon/" + contact.getUserName() + ".png"));
+                InputStream in = response.body().byteStream();
+                while ((b = in.read(buf)) != -1) {
+                    out.write(buf, 0, b);
+                }
+                in.close();
+                out.close();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
 }
