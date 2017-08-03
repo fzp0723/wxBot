@@ -33,59 +33,32 @@ import java.util.regex.Pattern;
  * Created by fangzhipeng on 2017/7/18.
  */
 public class WeChat {
-
+    //项目临时文件目录
     private File tempRootDir = new File(System.getProperty("user.home") + "/.wxBot");;
-
+    //http请求client
     private OkHttpClient client = new OkHttpClient();
 
-    private final String ID_URL = "https://login.weixin.qq.com/jslogin?appid=wx782c26e4c19acffb&fun=new&lang=zh_CN&_=";
-
-    private final String QR_CODE_URL = "https://login.weixin.qq.com/l/%s";
-
-    //https://login.weixin.qq.com/cgi-bin/mmwebwx-bin/login?tip=%s&uuid=%s&_=%s
-
-    private final String QUERY_LOGIN_URL = "https://login.weixin.qq.com/cgi-bin/mmwebwx-bin/login?uuid=%s&tip=1&_=%s";
-
-    //https://wx.qq.com/cgi-bin/mmwebwx-bin/webwxnewloginpage?ticket=AZIGwFAhLwYpsl2Vb58f8a_d@qrticket_0&uuid=AajL59ccVA==&lang=zh_CN&scan=1500473302&fun=new
-    //https://wx.qq.com/cgi-bin/mmwebwx-bin/webwxnewloginpage?ticket=AWa4aLOGudDEUnKxXhPGBnVf@qrticket_0&uuid=4eS6FygDDQ==&lang=zh_CN&scan=1500475502
-
     private String redirect_uri;
-
-    private String wxuin;
-
-    private String wxsid;
-
-    private String skey;
-
-    private String pass_ticket;
+    //微信身份验证参数
+    private String wxuin, wxsid, skey, pass_ticket;
 
     private String BASE_URL;
 
     private String BASE_HOST;
-
+    //登录微信的设备Id
     private String DeviceID = "e" + (Math.random() + "").substring(2, 17);
 
     private String INIT_JSON="{\"BaseRequest\":{\"Sid\": \"%s\", \"Skey\": \"%s\", \"DeviceID\": \"%s\", \"Uin\": \"%s\"}}";
-
-    private static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
-
+    //我的账号信息
     private MyAcount myAcount;
-
+    //联系人信息
     private List<Contact> contacts;
-
-    private Map<String, Contact> contactByUserName;
-
-    private JSONObject MY_ACOUNT;
 
     private JSONObject SyncKeyObject;
 
     private String SyncKey = "";
 
     private String SYNC_HOST;
-
-    private String SYNC_URL = "https://webpush.weixin.qq.com/cgi-bin/mmwebwx-bin/synccheck?";
-
-    private Timer SYNC_TIMER = new Timer();
 
     private MessageHandler handler;
 
@@ -171,14 +144,14 @@ public class WeChat {
     }
 
     private String login() throws Exception{
-        String url = ID_URL + getTimestamp();
+        String url = "https://login.weixin.qq.com/jslogin?appid=wx782c26e4c19acffb&fun=new&lang=zh_CN&_=" + getTimestamp();
         Response response = get(url);
         if(!response.isSuccessful())
             return "登录异常！";
         String uuid = getUUID(response.body().string());
         genQRCode(uuid);
         while (true) {
-            url = String.format(QUERY_LOGIN_URL, uuid, getTimestamp());
+            url = String.format("https://login.weixin.qq.com/cgi-bin/mmwebwx-bin/login?uuid=%s&tip=1&_=%s", uuid, getTimestamp());
             response = get(url);
             if(!response.isSuccessful())
                 return "登录异常！";
@@ -317,7 +290,8 @@ public class WeChat {
     }
 
     private Response postJson(String url, String json) throws Exception{
-        Request request = genBuilder().url(url).post(RequestBody.create(JSON, json)).build();
+        MediaType jsonType = MediaType.parse("application/json; charset=utf-8");
+        Request request = genBuilder().url(url).post(RequestBody.create(jsonType, json)).build();
         return client.newCall(request).execute();
     }
 
@@ -346,7 +320,7 @@ public class WeChat {
     }
 
     private void genQRCode(String uuid) throws Exception{
-        String text = String.format(QR_CODE_URL, uuid); // 二维码内容
+        String text = String.format("https://login.weixin.qq.com/l/%s", uuid); // 二维码内容
         Hashtable<EncodeHintType, String> hints = new Hashtable<EncodeHintType, String>();
         hints.put(EncodeHintType.CHARACTER_SET, "utf-8");   // 内容所使用字符集编码
         QRCode qrCode = Encoder.encode(text, ErrorCorrectionLevel.L, hints);
@@ -435,8 +409,7 @@ public class WeChat {
     }
 
     private void initMyAcount(JSONObject msgObject) {
-        MY_ACOUNT = msgObject.getJSONObject("User");
-        myAcount = JSONObject.parseObject(MY_ACOUNT.toJSONString(), MyAcount.class);
+        myAcount = JSONObject.parseObject(msgObject.getJSONObject("User").toJSONString(), MyAcount.class);
     }
 
     private void initSyncKey(JSONObject msgObject) {
@@ -453,10 +426,8 @@ public class WeChat {
             return "获取朋友列表失败！";
         String msg = response.body().string();
         contacts = JSONObject.parseArray(JSONObject.parseObject(msg).getString("MemberList"), Contact.class);
-        contactByUserName = new HashMap<>();
         contacts.forEach(contact -> {
             contact.setHeadImgUrl(BASE_URL.replace("/cgi-bin/mmwebwx-bin", "") + contact.getHeadImgUrl() + skey);
-            contactByUserName.put(contact.getUserName(), contact);
         });
         cacheContactIcon(contacts);
         return "获取朋友列表成功！";
